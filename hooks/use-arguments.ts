@@ -3,9 +3,14 @@
 import { useState } from "react"
 import type { Argument } from "@/types/decision"
 
+interface NewArgument {
+  text: string
+  weight: number
+}
+
 export function useArguments() {
   const [args, setArgs] = useState<Argument[]>([])
-  const [newArgument, setNewArgument] = useState({ text: "", weight: 0 })
+  const [newArgument, setNewArgument] = useState<NewArgument>({ text: "", weight: 0 })
 
   const addArgument = () => {
     if (newArgument.text.trim()) {

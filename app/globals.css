@@ -4,21 +4,21 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Updated color tokens to match modern landing page design brief */
+  /* Updated color tokens to match modern design brief with accent color #10b981 */
   --background: #ffffff;
-  --foreground: #164e63;
+  --foreground: #1f2937; /* Updated foreground color to neutral gray instead of cyan */
   --card: #ecfeff;
   --card-foreground: #475569;
   --popover: #ffffff;
-  --popover-foreground: #164e63;
+  --popover-foreground: #1f2937; /* Updated foreground color to neutral gray instead of cyan */
   --primary: #164e63;
   --primary-foreground: #ffffff;
   --secondary: #f97316;
   --secondary-foreground: #ffffff;
   --muted: #f8fafc;
   --muted-foreground: #475569;
-  --accent: #f97316;
-  --accent-foreground: #164e63;
+  --accent: #164e63;
+  --accent-foreground: #ffffff;
   --destructive: #ea580c;
   --destructive-foreground: #ffffff;
   --border: #d1d5db;
@@ -34,14 +34,14 @@
   --sidebar-foreground: #164e63;
   --sidebar-primary: #ffffff;
   --sidebar-primary-foreground: #164e63;
-  --sidebar-accent: #f97316;
+  --sidebar-accent: #10b981;
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: #d1d5db;
   --sidebar-ring: rgba(22, 78, 99, 0.5);
 }
 
 .dark {
-  /* Updated dark mode tokens for consistency */
+  /* Updated dark mode tokens with accent color #10b981 for consistency */
   --background: #0f172a;
   --foreground: #f1f5f9;
   --card: #1e293b;
@@ -54,7 +54,7 @@
   --secondary-foreground: #0f172a;
   --muted: #334155;
   --muted-foreground: #94a3b8;
-  --accent: #f97316;
+  --accent: #10b981;
   --accent-foreground: #0f172a;
   --destructive: #ef4444;
   --destructive-foreground: #f1f5f9;
@@ -70,7 +70,7 @@
   --sidebar-foreground: #f1f5f9;
   --sidebar-primary: #0ea5e9;
   --sidebar-primary-foreground: #0f172a;
-  --sidebar-accent: #f97316;
+  --sidebar-accent: #10b981;
   --sidebar-accent-foreground: #0f172a;
   --sidebar-border: #334155;
   --sidebar-ring: rgba(14, 165, 233, 0.5);

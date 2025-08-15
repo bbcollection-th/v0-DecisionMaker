@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { ArrowLeft, FileText, Search, Calendar, TrendingUp, TrendingDown, Minus } from "lucide-react"
 import { useDecision } from "@/hooks/use-decision"
 import { useAuth } from "@/hooks/use-auth"
+import { createClient } from "@/lib/supabase/client"
 import type { Decision } from "@/types/decision"
 
 const ITEMS_PER_PAGE = 12
@@ -23,6 +24,8 @@ export default function HistoryPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
 
+  const supabase = useMemo(() => createClient(), [])
+
   useEffect(() => {
     if (!user) {
       router.push("/auth/login")
@@ -31,9 +34,6 @@ export default function HistoryPage() {
 
     const fetchAllDecisions = async () => {
       try {
-        const { createClient } = await import("@/lib/supabase/client")
-        const supabase = createClient()
-
         const { data, error } = await supabase
           .from("decisions")
           .select(`
@@ -54,13 +54,13 @@ export default function HistoryPage() {
     }
 
     fetchAllDecisions()
-  }, [user, router])
+  }, [user, router, supabase])
 
   useEffect(() => {
-    const filtered = decisions.filter(
+    const filtered = (decisions || []).filter(
       (decision) =>
-        decision.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        decision.description.toLowerCase().includes(searchTerm.toLowerCase()),
+        (decision.title || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (decision.description || "").toLowerCase().includes(searchTerm.toLowerCase()),
     )
     setFilteredDecisions(filtered)
     setCurrentPage(1)
@@ -72,10 +72,12 @@ export default function HistoryPage() {
   }
 
   const getDecisionStats = (decision: Decision) => {
-    const positiveScore =
-      decision.arguments?.filter((arg) => arg.weight > 0).reduce((sum, arg) => sum + arg.weight, 0) || 0
+    const argumentsArray = decision.arguments || []
+    const positiveScore = argumentsArray
+      .filter((arg) => arg?.weight > 0)
+      .reduce((sum, arg) => sum + (arg?.weight || 0), 0)
     const negativeScore = Math.abs(
-      decision.arguments?.filter((arg) => arg.weight < 0).reduce((sum, arg) => sum + arg.weight, 0) || 0,
+      argumentsArray.filter((arg) => arg?.weight < 0).reduce((sum, arg) => sum + (arg?.weight || 0), 0),
     )
     const ratio = negativeScore > 0 ? positiveScore / negativeScore : positiveScore > 0 ? Number.POSITIVE_INFINITY : 1
     const recommendation = ratio >= 2 ? "Favorable" : ratio <= 0.5 ? "Défavorable" : "Mitigé"
@@ -105,9 +107,10 @@ export default function HistoryPage() {
     }
   }
 
-  const totalPages = Math.ceil(filteredDecisions.length / ITEMS_PER_PAGE)
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
-  const paginatedDecisions = filteredDecisions.slice(startIndex, startIndex + ITEMS_PER_PAGE)
+  const totalPages = Math.ceil(Math.max(0, filteredDecisions.length) / ITEMS_PER_PAGE)
+  const startIndex = Math.max(0, (currentPage - 1) * ITEMS_PER_PAGE)
+  const endIndex = Math.min(filteredDecisions.length, startIndex + ITEMS_PER_PAGE)
+  const paginatedDecisions = (filteredDecisions || []).slice(startIndex, endIndex)
 
   if (loading) {
     return (
@@ -129,7 +132,7 @@ export default function HistoryPage() {
           <div>
             <h1 className="text-3xl font-bold text-foreground">Historique des décisions</h1>
             <p className="text-muted-foreground">
-              {decisions.length} décision{decisions.length > 1 ? "s" : ""} au total
+              {decisions.length} décision{decisions.length > 1 ? "s" : ""}
             </p>
           </div>
         </div>
@@ -161,13 +164,15 @@ export default function HistoryPage() {
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-2 min-w-0 flex-1">
                           <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                          <CardTitle className="text-lg truncate">{decision.title}</CardTitle>
+                          <CardTitle className="text-lg truncate">{decision.title || "Décision sans titre"}</CardTitle>
                         </div>
                         {getRecommendationIcon(stats.recommendation)}
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <p className="text-sm text-muted-foreground line-clamp-2">{decision.description}</p>
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {decision.description || "Aucune description"}
+                      </p>
 
                       <div className="flex items-center justify-between">
                         <Badge className={`${getRecommendationColor(stats.recommendation)} border-0`}>
@@ -184,7 +189,7 @@ export default function HistoryPage() {
                           {new Date(decision.updated_at).toLocaleDateString("fr-FR")}
                         </div>
                         <div>
-                          {decision.arguments?.length || 0} argument{(decision.arguments?.length || 0) > 1 ? "s" : ""}
+                          {(decision.arguments || []).length} argument{(decision.arguments || []).length > 1 ? "s" : ""}
                         </div>
                       </div>
                     </CardContent>

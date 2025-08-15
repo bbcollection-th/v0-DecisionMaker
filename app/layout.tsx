@@ -2,6 +2,8 @@ import type { Metadata } from "next"
 import { Inter, Space_Grotesk } from "next/font/google"
 import type React from "react"
 import "./globals.css"
+import { ToastProvider } from "@/hooks/use-toast"
+import ErrorBoundary from "@/components/error-boundary"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -29,7 +31,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr" className={`${inter.variable} ${spaceGrotesk.variable} antialiased`}>
-      <body className="transition-colors duration-300">{children}</body>
+      <body className="transition-colors duration-300">
+        <ErrorBoundary>
+          <ToastProvider>{children}</ToastProvider>
+        </ErrorBoundary>
+      </body>
     </html>
   )
 }

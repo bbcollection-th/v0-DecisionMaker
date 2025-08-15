@@ -5,19 +5,26 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Save } from "lucide-react"
 import type { Decision } from "@/types/decision"
 import type { User } from "@supabase/supabase-js"
 
 interface DecisionHeaderProps {
   currentDecision: Decision
-  setCurrentDecision: (decision: Decision) => void
+  onTitleChange: (title: string) => void
+  onDescriptionChange: (description: string) => void
   user: User | null
   saving: boolean
-  onSave: () => void
+  onCreateNew: () => void
 }
 
-export function DecisionHeader({ currentDecision, setCurrentDecision, user, saving, onSave }: DecisionHeaderProps) {
+export function DecisionHeader({
+  currentDecision,
+  onTitleChange,
+  onDescriptionChange,
+  user,
+  saving,
+  onCreateNew,
+}: DecisionHeaderProps) {
   return (
     <Card className="border-2 border-primary/20">
       <CardHeader>
@@ -30,7 +37,7 @@ export function DecisionHeader({ currentDecision, setCurrentDecision, user, savi
             id="decision-title"
             placeholder="Ex: Changer d'emploi, Acheter une maison..."
             value={currentDecision.title}
-            onChange={(e) => setCurrentDecision({ ...currentDecision, title: e.target.value })}
+            onChange={(e) => onTitleChange(e.target.value)}
             className="text-lg"
           />
         </div>
@@ -41,17 +48,24 @@ export function DecisionHeader({ currentDecision, setCurrentDecision, user, savi
             id="decision-description"
             placeholder="Décrivez votre situation, les enjeux, le contexte..."
             value={currentDecision.description}
-            onChange={(e) => setCurrentDecision({ ...currentDecision, description: e.target.value })}
+            onChange={(e) => onDescriptionChange(e.target.value)}
             rows={3}
           />
         </div>
 
-        {user ? (
-          <Button onClick={onSave} disabled={!currentDecision.title.trim() || saving} className="w-full">
-            <Save className="w-4 h-4 mr-2" />
-            {saving ? "Sauvegarde..." : "Sauvegarder la décision"}
+        <div className="flex items-center justify-between">
+          {user && currentDecision.title.trim() && (
+            <div className="flex items-center text-sm text-muted-foreground">
+              <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+              Sauvegarde automatique
+            </div>
+          )}
+          <Button onClick={onCreateNew} variant="outline" className="ml-auto bg-transparent">
+            Nouvelle décision
           </Button>
-        ) : (
+        </div>
+
+        {!user && (
           <div className="text-center p-4 bg-muted rounded-lg">
             <p className="text-sm text-muted-foreground">Connectez-vous pour sauvegarder vos décisions</p>
           </div>

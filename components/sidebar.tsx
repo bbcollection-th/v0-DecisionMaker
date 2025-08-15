@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import type { User } from "@supabase/supabase-js"
 import {
   LogIn,
@@ -13,47 +15,101 @@ import {
   FileText,
   History,
   ChevronRight,
+  MoreVertical,
+  Trash2,
+  Edit3,
+  Pin,
 } from "lucide-react"
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo, useRef } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { supabase } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client"
 import { useDecision } from "@/hooks/use-decision"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 interface SidebarProps {
   isOpen: boolean
   onToggle: () => void
   isDarkMode: boolean
   onToggleDarkMode: () => void
+  onLoadDecision?: (decisionId: string) => Promise<void>
 }
 
-export function Sidebar({ isOpen, onToggle, isDarkMode, onToggleDarkMode }: SidebarProps) {
+export function Sidebar({ isOpen, onToggle, isDarkMode, onToggleDarkMode, onLoadDecision }: SidebarProps) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
-  const { recentDecisions, loadDecision, currentDecision } = useDecision()
+  const [authInitialized, setAuthInitialized] = useState(false)
+  const [renamingDecision, setRenamingDecision] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState("")
+  const {
+    savedDecisions,
+    loadDecision,
+    currentDecision,
+    getRecentDecisions,
+    loadDecisionHistory,
+    deleteDecision,
+    renameDecision,
+    pinDecision,
+  } = useDecision()
+
+  const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
+    let mounted = true
+
     const getUser = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      setUser(user)
-      setLoading(false)
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getSession()
+
+        if (mounted) {
+          setUser(user)
+          setLoading(false)
+          setAuthInitialized(true)
+
+          if (user) {
+            await loadDecisionHistory(user)
+          }
+        }
+      } catch (error) {
+        console.error("[v0] Error getting user session:", error)
+        if (mounted) {
+          setLoading(false)
+          setAuthInitialized(true)
+        }
+      }
     }
 
     getUser()
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-      setLoading(false)
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("[v0] Auth state change:", event, !!session?.user)
+
+      if (mounted) {
+        const newUser = session?.user ?? null
+
+        if (user?.id !== newUser?.id || (user === null && newUser !== null) || (user !== null && newUser === null)) {
+          setUser(newUser)
+          setLoading(false)
+          setAuthInitialized(true)
+
+          if (newUser) {
+            await loadDecisionHistory(newUser)
+          }
+        }
+      }
     })
 
-    return () => subscription.unsubscribe()
-  }, [])
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
+  }, [supabase])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -63,18 +119,22 @@ export function Sidebar({ isOpen, onToggle, isDarkMode, onToggleDarkMode }: Side
     if (user.user_metadata?.firstName) {
       return user.user_metadata.firstName
     }
-    // Extract first part of email as fallback
     const emailName = user.email?.split("@")[0] || "Utilisateur"
     return emailName.charAt(0).toUpperCase() + emailName.slice(1)
   }
 
   const handleDecisionSelect = async (decisionId: string) => {
-    await loadDecision(decisionId)
-    onToggle() // Close sidebar on mobile after selection
+    if (onLoadDecision) {
+      await onLoadDecision(decisionId)
+    } else {
+      await loadDecision(decisionId)
+    }
+    onToggle()
   }
 
-  const formatDecisionTitle = (title: string) => {
-    return title.length > 25 ? `${title.substring(0, 25)}...` : title
+  const formatDecisionTitle = (title: string | null | undefined) => {
+    const safeTitle = title || "Décision sans titre"
+    return safeTitle.length > 25 ? `${safeTitle.substring(0, 25)}...` : safeTitle
   }
 
   const getRecommendationColor = (positiveScore: number, negativeScore: number) => {
@@ -84,10 +144,37 @@ export function Sidebar({ isOpen, onToggle, isDarkMode, onToggleDarkMode }: Side
     return "text-orange-600 dark:text-orange-400"
   }
 
-  if (loading) {
+  const recentDecisions = getRecentDecisions(10)
+
+  const handleDeleteDecision = async (decisionId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (confirm("Êtes-vous sûr de vouloir supprimer cette décision ?")) {
+      await deleteDecision(user, decisionId)
+    }
+  }
+
+  const handleRenameDecision = (decisionId: string, currentTitle: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setRenamingDecision(decisionId)
+    setRenameValue(currentTitle)
+  }
+
+  const handleRenameSubmit = async (decisionId: string) => {
+    if (renameValue.trim()) {
+      await renameDecision(user, decisionId, renameValue.trim())
+    }
+    setRenamingDecision(null)
+    setRenameValue("")
+  }
+
+  const handlePinDecision = async (decisionId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    await pinDecision(user, decisionId)
+  }
+
+  if (loading && !authInitialized) {
     return (
       <>
-        {/* Overlay */}
         {isOpen && (
           <button
             type="button"
@@ -103,7 +190,6 @@ export function Sidebar({ isOpen, onToggle, isDarkMode, onToggleDarkMode }: Side
           />
         )}
 
-        {/* Sidebar */}
         <div
           className={`
           fixed top-0 left-0 h-full w-80 bg-white dark:bg-gray-900 shadow-lg z-50 transform transition-transform duration-300 ease-in-out
@@ -129,7 +215,6 @@ export function Sidebar({ isOpen, onToggle, isDarkMode, onToggleDarkMode }: Side
 
   return (
     <>
-      {/* Overlay */}
       {isOpen && (
         <button
           type="button"
@@ -145,7 +230,6 @@ export function Sidebar({ isOpen, onToggle, isDarkMode, onToggleDarkMode }: Side
         />
       )}
 
-      {/* Sidebar */}
       <div
         className={`
         fixed top-0 left-0 h-full w-80 bg-card shadow-lg z-50 transform transition-transform duration-300 ease-in-out
@@ -153,7 +237,6 @@ export function Sidebar({ isOpen, onToggle, isDarkMode, onToggleDarkMode }: Side
       `}
       >
         <div className="flex flex-col h-full">
-          {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-border">
             <h2 className="text-lg font-semibold text-foreground">Menu</h2>
             <Button variant="ghost" size="sm" onClick={onToggle}>
@@ -161,9 +244,7 @@ export function Sidebar({ isOpen, onToggle, isDarkMode, onToggleDarkMode }: Side
             </Button>
           </div>
 
-          {/* Content */}
           <div className="flex-1 p-4 space-y-4 overflow-y-auto">
-            {/* User Section */}
             {user ? (
               <Card>
                 <CardContent className="p-4">
@@ -195,7 +276,6 @@ export function Sidebar({ isOpen, onToggle, isDarkMode, onToggleDarkMode }: Side
               </div>
             )}
 
-            {/* Recent Decisions Section */}
             {user && recentDecisions && recentDecisions.length > 0 && (
               <Card>
                 <CardContent className="p-4">
@@ -211,54 +291,122 @@ export function Sidebar({ isOpen, onToggle, isDarkMode, onToggleDarkMode }: Side
                     </Link>
                   </div>
                   <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {(recentDecisions || []).slice(0, 10).map((decision) => {
+                    {recentDecisions.map((decision) => {
                       const isActive = currentDecision?.id === decision.id
-                      const positiveScore =
-                        decision.arguments?.filter((arg) => arg.weight > 0).reduce((sum, arg) => sum + arg.weight, 0) ||
-                        0
+                      const argumentsArray = decision.arguments || []
+                      const positiveScore = argumentsArray
+                        .filter((arg) => arg?.weight > 0)
+                        .reduce((sum, arg) => sum + (arg?.weight || 0), 0)
                       const negativeScore = Math.abs(
-                        decision.arguments?.filter((arg) => arg.weight < 0).reduce((sum, arg) => sum + arg.weight, 0) ||
-                          0,
+                        argumentsArray
+                          .filter((arg) => arg?.weight < 0)
+                          .reduce((sum, arg) => sum + (arg?.weight || 0), 0),
                       )
                       const recommendation = getRecommendationColor(positiveScore, negativeScore)
 
                       return (
-                        <button
+                        <div
                           key={decision.id}
-                          onClick={() => handleDecisionSelect(decision.id)}
-                          className={`w-full text-left p-3 rounded-lg border transition-colors hover:bg-accent/50 ${
+                          className={`group relative w-full rounded-lg border transition-colors hover:bg-accent/50 ${
                             isActive
                               ? "bg-primary/10 border-primary/20"
                               : "bg-card border-border hover:border-border/60"
                           }`}
                         >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <FileText className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                                <p className="font-medium text-sm text-card-foreground truncate">
-                                  {formatDecisionTitle(decision.title)}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-2 mt-1">
-                                <span className={`text-xs font-medium ${recommendation}`}>
-                                  {recommendation === "text-green-600 dark:text-green-400"
-                                    ? "Favorable"
-                                    : recommendation === "text-red-600 dark:text-red-400"
-                                      ? "Défavorable"
-                                      : "Mitigé"}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                  {positiveScore}:{negativeScore}
-                                </span>
-                              </div>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {new Date(decision.updated_at).toLocaleDateString("fr-FR")}
-                              </p>
+                          {renamingDecision === decision.id ? (
+                            <div className="p-3">
+                              <input
+                                type="text"
+                                value={renameValue}
+                                onChange={(e) => setRenameValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    handleRenameSubmit(decision.id)
+                                  } else if (e.key === "Escape") {
+                                    setRenamingDecision(null)
+                                  }
+                                }}
+                                onBlur={() => handleRenameSubmit(decision.id)}
+                                className="w-full px-2 py-1 text-sm bg-background border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                autoFocus
+                              />
                             </div>
-                            <ChevronRight className="w-3 h-3 text-muted-foreground flex-shrink-0" />
-                          </div>
-                        </button>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => handleDecisionSelect(decision.id)}
+                                className="w-full text-left p-3 rounded-lg"
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <FileText className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                                      <p className="font-medium text-sm text-card-foreground truncate">
+                                        {formatDecisionTitle(decision.title)}
+                                      </p>
+                                    </div>
+                                    <div className="flex items-center gap-2 mt-1">
+                                      <span className={`text-xs font-medium ${recommendation}`}>
+                                        {recommendation === "text-green-600 dark:text-green-400"
+                                          ? "Favorable"
+                                          : recommendation === "text-red-600 dark:text-red-400"
+                                            ? "Défavorable"
+                                            : "Mitigé"}
+                                      </span>
+                                      <span className="text-xs text-muted-foreground">
+                                        {positiveScore}:{negativeScore}
+                                      </span>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      {(() => {
+                                        const ts = decision.updated_at || decision.created_at
+                                        if (!ts) return "—"
+                                        const d = new Date(ts)
+                                        return isNaN(d.getTime()) ? "—" : d.toLocaleDateString("fr-FR")
+                                      })()}
+                                  </div>
+                                  <ChevronRight className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                                </div>
+                              </button>
+
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="absolute top-2 right-2 w-6 h-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <MoreVertical className="w-3 h-3" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-40">
+                                  <DropdownMenuItem
+                                    onClick={(e) => handlePinDecision(decision.id, e)}
+                                    className="cursor-pointer"
+                                  >
+                                    <Pin className="w-3 h-3 mr-2" />
+                                    Épingler
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={(e) => handleRenameDecision(decision.id, decision.title || "", e)}
+                                    className="cursor-pointer"
+                                  >
+                                    <Edit3 className="w-3 h-3 mr-2" />
+                                    Renommer
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={(e) => handleDeleteDecision(decision.id, e)}
+                                    className="cursor-pointer text-destructive focus:text-destructive"
+                                  >
+                                    <Trash2 className="w-3 h-3 mr-2" />
+                                    Supprimer
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </>
+                          )}
+                        </div>
                       )
                     })}
                   </div>
@@ -266,7 +414,6 @@ export function Sidebar({ isOpen, onToggle, isDarkMode, onToggleDarkMode }: Side
               </Card>
             )}
 
-            {/* Settings */}
             <Card>
               <CardContent className="p-4">
                 <h3 className="font-medium text-card-foreground mb-3 flex items-center gap-2">
@@ -275,7 +422,6 @@ export function Sidebar({ isOpen, onToggle, isDarkMode, onToggleDarkMode }: Side
                 </h3>
 
                 <div className="space-y-3">
-                  {/* Dark Mode Toggle */}
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Mode sombre</span>
                     <Button
@@ -291,7 +437,6 @@ export function Sidebar({ isOpen, onToggle, isDarkMode, onToggleDarkMode }: Side
               </CardContent>
             </Card>
 
-            {/* Stats (if user is logged in) */}
             {user && (
               <Card>
                 <CardContent className="p-4">
@@ -299,13 +444,13 @@ export function Sidebar({ isOpen, onToggle, isDarkMode, onToggleDarkMode }: Side
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Décisions prises</span>
-                      <Badge variant="secondary">{recentDecisions?.length || 0}</Badge>
+                      <Badge variant="secondary">{savedDecisions?.length || 0}</Badge>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Arguments ajoutés</span>
                       <Badge variant="secondary">
-                        {(recentDecisions || []).reduce(
-                          (total, decision) => total + (decision.arguments?.length || 0),
+                        {(savedDecisions || []).reduce(
+                          (total, decision) => total + (decision.arguments || []).length,
                           0,
                         )}
                       </Badge>
@@ -316,7 +461,6 @@ export function Sidebar({ isOpen, onToggle, isDarkMode, onToggleDarkMode }: Side
             )}
           </div>
 
-          {/* Footer */}
           {user && (
             <div className="p-4 border-t border-border">
               <Button

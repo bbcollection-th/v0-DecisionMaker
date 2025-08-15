@@ -89,6 +89,11 @@ export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRe
                 S'inscrire
               </Link>
             </div>
+            <div className="mt-2 text-center text-sm">
+              <Link href="/auth/forgot-password" className="underline underline-offset-4 text-muted-foreground">
+                Mot de passe oublié ?
+              </Link>
+            </div>
           </form>
         </CardContent>
       </Card>
