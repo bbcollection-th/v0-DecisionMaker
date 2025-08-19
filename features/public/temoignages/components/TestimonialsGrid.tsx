@@ -3,6 +3,7 @@
 import { Quote, Star } from "lucide-react"
 import Image from "next/image"
 import type { ReactNode } from "react"
+import { handleImageError } from "@/lib/utils"
 import { testimonials } from "../data"
 
 // Composant SimpleCard réutilisé depuis la page originale
@@ -33,11 +34,7 @@ export function TestimonialsGrid() {
                     className="w-12 h-12 rounded-full object-cover"
                     width={48}
                     height={48}
-                    onError={e => {
-                      const target = e.target as HTMLImageElement
-                      target.onerror = null
-                      target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(testimonial.name)}`
-                    }}
+                    onError={e => handleImageError(e, testimonial.name)}
                   />
                   <div>
                     <h3 className="font-semibold text-card-foreground">{testimonial.name}</h3>

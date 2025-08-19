@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react"
+import { useCallback, useEffect, useRef } from "react"
 
 /**
  * Hook pour debouncer une fonction
@@ -6,30 +6,19 @@ import { useCallback, useRef } from "react"
  * @param delay - Le délai en millisecondes
  * @returns La fonction debouncée avec une méthode cancel
  */
-export function useDebounce<T extends (...args: never[]) => void>(callback: T, delay: number) {
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+export function useDebounce<T extends (...args: unknown[]) => void>(callback: T, delay: number) {
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const callbackRef = useRef(callback)
+  const delayRef = useRef(delay)
 
-  // Garder la référence du callback à jour
-  callbackRef.current = callback
+  // Keep latest callback and delay
+  useEffect(() => {
+    callbackRef.current = callback
+  }, [callback])
+  useEffect(() => {
+    delayRef.current = delay
+  }, [delay])
 
-  const debouncedCallback = useCallback(
-    ((...args: Parameters<T>) => {
-      // Annuler le timeout précédent s'il existe
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-      }
-
-      // Créer un nouveau timeout
-      timeoutRef.current = setTimeout(() => {
-        callbackRef.current(...args)
-        timeoutRef.current = null
-      }, delay)
-    }) as T,
-    []
-  )
-
-  // Fonction pour annuler le debounce
   const cancel = useCallback(() => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current)
@@ -37,14 +26,24 @@ export function useDebounce<T extends (...args: never[]) => void>(callback: T, d
     }
   }, [])
 
-  // Nettoyage à la destruction du composant
-  const cleanup = useCallback(() => {
-    cancel()
-  }, [cancel])
+  const debouncedCallback = useCallback((...args: Parameters<T>) => {
+    // Cancel previous timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+    }
+    // Schedule next call with latest delay
+    timeoutRef.current = setTimeout(() => {
+      callbackRef.current(...args)
+      timeoutRef.current = null
+    }, delayRef.current)
+  }, [])
+
+  // Cleanup on unmount
+  useEffect(() => cancel, [cancel])
 
   return {
     cancel,
-    cleanup,
-    debouncedCallback
+    cleanup: cancel,
+    debouncedCallback: debouncedCallback as T
   }
 }

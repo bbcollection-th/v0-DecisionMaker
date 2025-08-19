@@ -96,7 +96,13 @@ export function useGenerateSuggestions() {
       }
 
       const data = await response.json()
-      const suggestions = data.suggestions || []
+      const rawSuggestions = data.suggestions || []
+
+      // Ajouter des IDs uniques aux suggestions reçues de l'API
+      const suggestions = rawSuggestions.map((suggestion: Omit<AISuggestion, "id">, index: number) => ({
+        ...suggestion,
+        id: `${Date.now()}-${index}` // Générer un ID unique basé sur timestamp + index
+      }))
 
       // Sauvegarder l'historique avant de définir les nouvelles suggestions
       saveToHistory()

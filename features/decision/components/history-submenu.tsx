@@ -92,29 +92,19 @@ export const HistorySubmenu = ({
 
   // Compter les décisions par type pour afficher dans les filtres
   const getDecisionCounts = () => {
-    const counts = {
-      defavorable: 0,
-      favorable: 0,
-      mitige: 0,
-      pinned: 0
-    }
-
-    decisions.forEach(decision => {
-      if (decision.isPinned) counts.pinned++
-
-      // Calculer le score pour déterminer la recommandation
-      const args = decision.arguments || []
-      const positiveScore = args.filter(arg => (arg.note || 0) > 0).reduce((sum, arg) => sum + (arg.note || 0), 0)
-      const negativeScore = Math.abs(args.filter(arg => (arg.note || 0) < 0).reduce((sum, arg) => sum + (arg.note || 0), 0))
-
-      if (positiveScore > negativeScore) {
-        counts.favorable++
-      } else if (negativeScore > positiveScore) {
-        counts.defavorable++
-      } else if (positiveScore > 0 || negativeScore > 0) {
-        counts.mitige++
-      }
-    })
+    const counts = decisions.reduce(
+      (acc, decision) => {
+        if (decision.isPinned) acc.pinned += 1
+        const args = decision.arguments || []
+        const positiveScore = args.filter(arg => (arg.note ?? 0) > 0).reduce((sum, arg) => sum + (arg.note ?? 0), 0)
+        const negativeScore = Math.abs(args.filter(arg => (arg.note ?? 0) < 0).reduce((sum, arg) => sum + (arg.note ?? 0), 0))
+        if (positiveScore > negativeScore) acc.favorable += 1
+        else if (negativeScore > positiveScore) acc.defavorable += 1
+        else if (positiveScore > 0 || negativeScore > 0) acc.mitige += 1
+        return acc
+      },
+      { defavorable: 0, favorable: 0, mitige: 0, pinned: 0 }
+    )
 
     return counts
   }

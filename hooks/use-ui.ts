@@ -29,12 +29,13 @@ export function useUI() {
   }
 }
 
+import { useTheme as useNextTheme } from "next-themes"
+
 /**
  * Hook optimisé pour le theme avec next-themes
  */
 export function useTheme() {
-  // ✅ Utilise next-themes au lieu de Zustand
-  const { theme, setTheme } = require("next-themes")
+  const { theme, setTheme } = useNextTheme()
   const isDarkMode = theme === "dark"
 
   return {

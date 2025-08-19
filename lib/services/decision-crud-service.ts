@@ -18,6 +18,13 @@ interface SupabaseDecision {
   }> | null
 }
 
+interface SupabaseArgumentRow {
+  id: string
+  text: string
+  note: number
+  created_at: string
+}
+
 export class DecisionCrudService {
   private supabase = createClient()
 
@@ -124,9 +131,8 @@ export class DecisionCrudService {
       }
 
       return {
-        // biome-ignore lint/suspicious/noExplicitAny: any
         arguments: (data.arguments || []).map(
-          (arg: any): LoadedArgument => ({
+          (arg: SupabaseArgumentRow): LoadedArgument => ({
             createdAt: new Date(arg.created_at || new Date()),
             id: arg.id,
             note: arg.note,
@@ -319,22 +325,36 @@ export class DecisionCrudService {
           text: arg.text
         }))
 
-        const { error: argumentsError } = await this.supabase.from("arguments").insert(argumentsToInsert)
+        const { data: insertedArgs, error: argumentsError } = await this.supabase.from("arguments").insert(argumentsToInsert).select()
+
         if (argumentsError) throw argumentsError
+
+        // Use the real arguments with actual IDs and timestamps from database
+        const realArguments = (insertedArgs || []).map((arg: SupabaseArgumentRow) => ({
+          createdAt: new Date(arg.created_at),
+          id: arg.id,
+          note: arg.note,
+          text: arg.text,
+          updatedAt: new Date(arg.created_at) // arguments table doesn't have updated_at
+        }))
+
+        return {
+          arguments: realArguments,
+          createdAt: new Date(decisionData.created_at),
+          description: validatedDecision.description,
+          id: decisionData.id,
+          title: validatedDecision.title,
+          updatedAt: new Date(decisionData.updated_at)
+        }
       }
 
       return {
-        arguments: validatedArgs.map((arg, index) => ({
-          ...arg,
-          createdAt: new Date(),
-          id: `temp-${decisionData.id}-${index}`, // ID temporaire pour les nouveaux arguments
-          updatedAt: new Date()
-        })),
-        createdAt: new Date(),
+        arguments: [],
+        createdAt: new Date(decisionData.created_at),
         description: validatedDecision.description,
         id: decisionData.id,
         title: validatedDecision.title,
-        updatedAt: new Date()
+        updatedAt: new Date(decisionData.updated_at)
       }
     } catch (error) {
       console.error("Error saving decision:", error)
