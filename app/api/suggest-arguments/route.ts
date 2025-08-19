@@ -60,12 +60,26 @@ Génère exactement 6 arguments (3 positifs avec poids 3-8, 3 négatifs avec poi
     // Parser la réponse JSON
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
-      throw new Error("Invalid JSON response from AI")
+      return NextResponse.json({ error: "Invalid JSON response from AI" }, { status: 502 })
     }
 
-    const suggestions = JSON.parse(jsonMatch[0])
-
-    return NextResponse.json(suggestions)
+    try {
+      const parsed = JSON.parse(jsonMatch[0])
+      // Basic shape validation
+      if (!parsed || !Array.isArray(parsed.suggestions)) {
+        return NextResponse.json({ error: "AI response missing suggestions array" }, { status: 502 })
+      }
+      // Normalize items to expected fields
+      const safeSuggestions = parsed.suggestions
+        .filter((s: unknown) => s && typeof s === "object" && "text" in s && "note" in s && typeof s.text === "string" && typeof s.note === "number")
+        .map((s: unknown) => {
+          const suggestion = s as { text: string; note: number; category?: string }
+          return { category: suggestion.category, note: suggestion.note, text: suggestion.text }
+        })
+      return NextResponse.json({ suggestions: safeSuggestions })
+    } catch {
+      return NextResponse.json({ error: "Failed to parse AI response" }, { status: 502 })
+    }
   } catch (error) {
     console.error("Error generating suggestions:", error)
     return NextResponse.json({ error: "Failed to generate suggestions" }, { status: 500 })

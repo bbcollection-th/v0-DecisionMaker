@@ -79,6 +79,11 @@ export function useAutoSave({ user, draftDecision, arguments: args, enabled = tr
         updateDraftField("id", result.data.decision.id)
       }
 
+      // Keep draft metadata in sync for optimistic locking
+      updateDraftField("version", result.data.decision.version)
+      updateDraftField("updatedAt", result.data.decision.updatedAt)
+      updateDraftField("createdAt", result.data.decision.createdAt)
+
       // ✅ Mise à jour de la référence après sauvegarde réussie
       savedDataRef.current = {
         argsLength: args.length,

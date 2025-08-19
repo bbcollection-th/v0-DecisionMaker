@@ -1,5 +1,6 @@
 import { create } from "zustand"
 import { devtools } from "zustand/middleware"
+import { generateUUID } from "@/lib/utils"
 import type { Argument, Decision } from "@/types/decision"
 
 interface DecisionState {
@@ -80,7 +81,7 @@ export const useDecisionStore = create<DecisionStore>()(
       addDraftArgument: arg =>
         set(
           state => ({
-            draftArguments: [...state.draftArguments, { ...arg, id: crypto.randomUUID() }],
+            draftArguments: [...state.draftArguments, { ...arg, id: generateUUID() }],
             hasUnsavedChanges: true
           }),
           false,

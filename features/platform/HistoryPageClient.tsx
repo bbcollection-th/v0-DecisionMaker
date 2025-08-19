@@ -27,6 +27,8 @@ export function HistoryPageClient() {
   const [currentPage, setCurrentPage] = useState(1)
   const [mounted, setMounted] = useState(false)
 
+  const normalizedSearch = useMemo(() => (searchTerm || "").toLowerCase().trim(), [searchTerm])
+
   const { data: decisions = [], isLoading, error } = useDecisionHistory(user)
   const { getDecisionStats } = useDecisionStats()
 
@@ -36,17 +38,18 @@ export function HistoryPageClient() {
   }, [])
 
   const filteredDecisions = useMemo(() => {
-    return (decisions || []).filter(
-      (decision: Decision) =>
-        (decision.title || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (decision.description || "").toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  }, [decisions, searchTerm])
+    return (decisions || []).filter((decision: Decision) => {
+      const title = (decision.title || "").toLowerCase()
+      const description = (decision.description || "").toLowerCase()
+      return title.includes(normalizedSearch) || description.includes(normalizedSearch)
+    })
+  }, [decisions, normalizedSearch])
 
   // Réinitialiser la page courante lorsque le terme de recherche change
+  // biome-ignore lint/correctness/useExhaustiveDependencies: faux positif
   useEffect(() => {
     setCurrentPage(1)
-  }, [])
+  }, [normalizedSearch])
 
   // Protection contre l'accès côté serveur
   if (!mounted) {

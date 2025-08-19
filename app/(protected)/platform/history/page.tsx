@@ -17,6 +17,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { useCurrentDecision } from "@/hooks/use-current-decision"
 import { useDecisionHistory } from "@/hooks/use-decision-queries"
 import { useDecisionStats } from "@/hooks/use-decision-stats"
+import { getErrorMessage } from "@/lib/utils"
 import type { Decision } from "@/types/decision"
 
 const ITEMS_PER_PAGE = 12
@@ -106,12 +107,11 @@ export default function HistoryPage() {
 
   // Gérer les erreurs de chargement
   useEffect(() => {
-    if (error) {
-      console.error("Erreur lors du chargement des décisions:", error)
-      // Si erreur d'authentification, rediriger vers la page de connexion
-      if (error.message.includes("auth") || error.message.includes("JWT")) {
-        router.push("/login")
-      }
+    if (!error) return
+    const msg = getErrorMessage(error)
+    console.error("Erreur lors du chargement des décisions:", msg)
+    if (msg.includes("auth") || msg.includes("JWT")) {
+      router.push("/login")
     }
   }, [error, router])
 
